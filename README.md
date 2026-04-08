@@ -4,7 +4,7 @@
 
 # Learn2Clean: Automated Data Cleaning with Reinforcement Learning
 
-
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/LaureBerti/Learn2Clean)
 
 **Learn2Clean V2** is a modular Python framework designed to optimize data preparation pipelines using **Deep Reinforcement
 Learning (DRL)**. It wraps standard data cleaning tasks (Imputation, Deduplication, Outlier Removal, Normalization) into
