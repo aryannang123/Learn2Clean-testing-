@@ -23,6 +23,7 @@ experiment:
   name: "09 Sequential Stable Baseline PPO"
   n_episodes: 50
   total_timesteps: 5000
+  seed: 42
 
 agent:
   params:

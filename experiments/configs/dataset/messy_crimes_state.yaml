@@ -1,13 +1,15 @@
 # @package _global_
 # ------------------------------------------------------------------------------
-# CRIMES DATASET CONFIGURATION
+# MESSY CRIMES - PREDICT STATE
 # ------------------------------------------------------------------------------
+# Simpler target: predict which state the crime occurred in
 
 dataset:
   _target_: learn2clean.loaders.CSVLoader
-  target_col: Category  # Main crime category (adjust if your dataset has different column)
+  target_col: state  # 0% missing, 10 states - good for classification
   file_path: null
-  dataset: crimes.csv
+  dataset: crime_incidents_messy.csv
   read_csv_kwargs:
     sep: ','
     encoding: 'utf-8'
+    na_values: ['', 'N/A', 'n/a', 'NULL', 'null', 'None', 'unknown', 'Unknown']

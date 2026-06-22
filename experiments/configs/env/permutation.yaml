@@ -1,0 +1,16 @@
+# @package _global_
+# ------------------------------------------------------------------------------
+# PERMUTATION CLEANING ENVIRONMENT CONFIGURATION
+# ------------------------------------------------------------------------------
+# Configuration for PermutationsCleaningEnv - a combinatorial pipeline selection
+# environment where the agent picks the best complete pipeline in one shot.
+
+env:
+  # Render mode for visualization (human, rgb_array, or None)
+  render_mode: human
+  
+  # Penalty applied when an action causes an error or exception
+  penalty_error: -0.5
+  
+  # Note: max_steps is not applicable for permutation environment
+  # as it selects a complete pipeline in a single step

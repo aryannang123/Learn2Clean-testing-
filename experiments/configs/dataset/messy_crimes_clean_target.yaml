@@ -1,13 +1,15 @@
 # @package _global_
 # ------------------------------------------------------------------------------
-# CRIMES DATASET CONFIGURATION
+# MESSY CRIMES WITH PREPROCESSED TARGET
 # ------------------------------------------------------------------------------
+# Uses crime_type as target (should be more complete)
 
 dataset:
   _target_: learn2clean.loaders.CSVLoader
-  target_col: Category  # Main crime category (adjust if your dataset has different column)
+  target_col: crime_type  # Predicting crime type (assault, burglary, etc.)
   file_path: null
-  dataset: crimes.csv
+  dataset: crime_incidents_messy.csv
   read_csv_kwargs:
     sep: ','
     encoding: 'utf-8'
+    na_values: ['', 'N/A', 'n/a', 'NULL', 'null', 'None', 'unknown', 'Unknown']

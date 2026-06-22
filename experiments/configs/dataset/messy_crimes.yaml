@@ -1,0 +1,16 @@
+# @package _global_
+# ------------------------------------------------------------------------------
+# MESSY CRIMES DATASET CONFIGURATION
+# ------------------------------------------------------------------------------
+# This is a real-world messy dataset perfect for testing advanced cleaning
+
+dataset:
+  _target_: learn2clean.loaders.CSVLoader
+  target_col: crime_type  # 0% missing, 182 unique crime types - perfect target!
+  file_path: null
+  dataset: crime_incidents_messy.csv
+  read_csv_kwargs:
+    sep: ','
+    encoding: 'utf-8'
+    # Handle various null representations
+    na_values: ['', 'N/A', 'n/a', 'NULL', 'null', 'None', 'unknown', 'Unknown']

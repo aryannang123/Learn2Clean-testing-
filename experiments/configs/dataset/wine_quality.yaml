@@ -1,0 +1,9 @@
+# @package _global_
+# Wine Quality Dataset Configuration
+dataset:
+  _target_: learn2clean.loaders.CSVLoader
+  target_col: quality
+  file_path: null
+  dataset: wine_quality.csv  # Download from UCI ML Repository
+  read_csv_kwargs:
+    sep: ';'  # Wine dataset uses semicolon separator

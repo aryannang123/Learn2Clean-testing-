@@ -1,0 +1,59 @@
+# @package _global_
+# ------------------------------------------------------------------------------
+# MY CUSTOM EXPERIMENT
+# ------------------------------------------------------------------------------
+
+defaults:
+  - default
+
+  # Choose your dataset (options: titanic_csv, openml_titanic, crimes_csv)
+  - /dataset: titanic_csv
+  
+  # Choose your action set (options: all, essentials, imputation, my_actions)
+  - /actions: my_actions
+  
+  # Choose environment type
+  - /env: sequential
+  
+  # Choose agent
+  - /agent: ppo_sequential
+  
+  - _self_
+
+# ------------------------------------------------------------------------------
+# EXPERIMENT PARAMETERS
+# ------------------------------------------------------------------------------
+experiment:
+  name: "My Custom Experiment"
+  total_timesteps: 10000  # Increase for better learning
+  seed: 42
+
+# ------------------------------------------------------------------------------
+# AGENT HYPERPARAMETERS
+# ------------------------------------------------------------------------------
+agent:
+  params:
+    learning_rate: 0.0003  # Lower = more stable, Higher = faster learning
+    n_steps: 128           # Steps per update
+    batch_size: 32         # Batch size for training
+    gamma: 0.99            # Discount factor
+    gae_lambda: 0.95       # GAE lambda
+    ent_coef: 0.01         # Entropy coefficient (exploration)
+    device: auto           # auto, cpu, or cuda
+
+# ------------------------------------------------------------------------------
+# ENVIRONMENT SETTINGS
+# ------------------------------------------------------------------------------
+env:
+  max_steps: 15            # Maximum actions per episode
+  penalty_error: -1.0      # Penalty for errors
+  penalty_repetition: -2.0 # Penalty for repeating actions
+
+# ------------------------------------------------------------------------------
+# WEIGHTS & BIASES SETTINGS
+# ------------------------------------------------------------------------------
+wandb:
+  sync_tensorboard: true
+  tags:
+    - custom_experiment
+    - testing

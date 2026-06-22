@@ -1,0 +1,15 @@
+# @package _global_
+# ------------------------------------------------------------------------------
+# CUSTOM DATASET CONFIGURATION
+# ------------------------------------------------------------------------------
+
+dataset:
+  _target_: learn2clean.loaders.CSVLoader
+  target_col: your_target_column_name  # Change this to your target column
+  file_path: null
+  dataset: your_data.csv  # Change this to your CSV filename in data/ folder
+  read_csv_kwargs:
+    sep: ','
+    # Add more pandas read_csv parameters if needed:
+    # encoding: 'utf-8'
+    # na_values: ['?', 'NA', 'N/A']

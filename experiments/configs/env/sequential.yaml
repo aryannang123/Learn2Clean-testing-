@@ -1,0 +1,19 @@
+# @package _global_
+# ------------------------------------------------------------------------------
+# SEQUENTIAL CLEANING ENVIRONMENT CONFIGURATION
+# ------------------------------------------------------------------------------
+# Configuration for SequentialCleaningEnv - a step-by-step pipeline construction
+# environment where the agent builds a cleaning pipeline action by action.
+
+env:
+  # Maximum number of steps (actions) the agent can take per episode
+  max_steps: 10
+  
+  # Render mode for visualization (human, rgb_array, or None)
+  render_mode: human
+  
+  # Penalty applied when an action causes an error or exception
+  penalty_error: -0.5
+  
+  # Penalty applied when the agent selects the same action twice in a row
+  penalty_repetition: -1.0

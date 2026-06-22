@@ -1,0 +1,72 @@
+# @package _global_
+# ------------------------------------------------------------------------------
+# CUSTOM ACTIONS CONFIGURATION
+# ------------------------------------------------------------------------------
+# Define your own set of cleaning actions for the agent to choose from
+
+actions:
+  # Deduplication
+  "0":
+    _target_: learn2clean.actions.ExactDeduplicator
+    name: ExactDeduplicator
+    columns: null  # null means apply to all columns
+    exclude: null
+    keep: first
+
+  # Imputation - Mean
+  "1":
+    _target_: learn2clean.actions.MeanImputer
+    name: MeanImputer
+    columns: null
+    exclude: null
+
+  # Imputation - Median
+  "2":
+    _target_: learn2clean.actions.MedianImputer
+    name: MedianImputer
+    columns: null
+    exclude: null
+
+  # Imputation - KNN
+  "3":
+    _target_: learn2clean.actions.KNNImputer
+    name: KNNImputer
+    columns: null
+    exclude: null
+    n_neighbors: 5
+
+  # Outlier Detection - IQR
+  "4":
+    _target_: learn2clean.actions.IQROutlierCleaner
+    name: IQROutlierCleaner
+    columns: null
+    exclude: null
+    factor: 1.5
+    method: mask  # Options: mask, remove, clip
+    numeric_only: true
+
+  # Outlier Detection - Z-Score
+  "5":
+    _target_: learn2clean.actions.ZScoreOutlierCleaner
+    name: ZScoreOutlierCleaner
+    columns: null
+    exclude: null
+    threshold: 3.0
+    method: mask
+    numeric_only: true
+
+  # Scaling - MinMax
+  "6":
+    _target_: learn2clean.actions.MinMaxScaler
+    name: MinMaxScaler
+    columns: null
+    exclude: null
+
+  # Scaling - Standard (Z-Score)
+  "7":
+    _target_: learn2clean.actions.ZScoreScaler
+    name: ZScoreScaler
+    columns: null
+    exclude: null
+    with_mean: true
+    with_std: true

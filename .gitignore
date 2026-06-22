@@ -105,3 +105,16 @@ ENV/
 
 # appveyor
 .appveyor.yml
+
+# Learn2Clean specific ignores
+# Experiment outputs and logs
+experiments/outputs/*/
+experiments/outputs/wandb/
+experiments/outputs/tensorboard/
+
+# Hydra outputs
+.hydra/
+outputs/
+
+# W&B files
+wandb/

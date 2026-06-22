@@ -1,0 +1,10 @@
+# @package _global_
+# ------------------------------------------------------------------------------
+# OPENML TITANIC DATASET CONFIGURATION
+# ------------------------------------------------------------------------------
+
+dataset:
+  _target_: learn2clean.loaders.OpenMLLoader
+  target_col: survived
+  name: "titanic"
+  version: 1
