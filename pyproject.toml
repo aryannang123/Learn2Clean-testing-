@@ -29,7 +29,7 @@ scikit-learn = "^1.8.0" # Machine learning algorithms and preprocessing utilitie
 stable-baselines3 = "2.4.1" # Reinforcement learning algorithms (PPO/DQN) for training agents.
 statsmodels = "^0.14.6" # Statistical modeling, including OLS (Ordinary Least Squares) regression.
 tabulate = "^0.9.0" # Library for creating readable, formatted tables (e.g., Markdown, ASCII) from data.
-torch = "2.2.0" # Torch
+torch = ">=2.6.0" # Torch (2.6+ required for Python 3.13 support)
 wandb = "^0.24.0" # Experiment tracking and visualization platform.
 weave = "^0.52.24" # Workflow tracing and observability utilities.
 

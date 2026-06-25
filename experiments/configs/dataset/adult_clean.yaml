@@ -1,0 +1,13 @@
+# @package _global_
+# ------------------------------------------------------------------------------
+# ADULT CLEAN DATASET CONFIGURATION
+# ------------------------------------------------------------------------------
+
+dataset:
+  _target_: learn2clean.loaders.CSVLoader
+  target_col: income
+  file_path: null
+  dataset: adult_clean.csv
+  read_csv_kwargs:
+    sep: ','
+    encoding: 'utf-8'

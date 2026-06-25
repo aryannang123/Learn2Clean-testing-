@@ -53,13 +53,27 @@ def load_and_split_data(cfg: DictConfig) -> SplitData:
     seed = cfg.get("experiment", {}).get("seed", None)
 
     # Split Data: Train / Test
-    # Note: We use the retrieved test_size/seed or defaults if config is missing
+    # Stratified split requires every class to have >= 2 members.
+    # For messy datasets (e.g. dirty categoricals with singleton classes) we
+    # fall back to a plain random split so the experiment can still proceed.
+    stratify = None
+    if y is not None:
+        min_class_count = y.value_counts().min()
+        if min_class_count >= 2:
+            stratify = y
+        else:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Stratified split skipped: {(y.value_counts() < 2).sum()} class(es) "
+                f"have only 1 sample. Falling back to random split."
+            )
+
     X_train, X_test, y_train, y_test = train_test_split(
         X,
         y,
         test_size=test_size,
         random_state=seed,
-        stratify=y,
+        stratify=stratify,
     )
 
     return SplitData(X, X_train, X_test, y, y_train, y_test)
