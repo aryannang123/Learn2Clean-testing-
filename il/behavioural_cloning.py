@@ -72,6 +72,8 @@ class BehaviouralCloning:
             raise ValueError("No training data — obs_array is empty.")
 
         self._obs = obs_array.astype(np.float32)
+        # Replace NaN/Inf in observations — prevents gradient corruption during BC
+        self._obs = np.nan_to_num(self._obs, nan=0.0, posinf=1.0, neginf=-1.0)
         self._actions = action_array.astype(np.int64)
         self._n_actions = n_actions
         self._n_epochs = n_epochs
@@ -137,6 +139,9 @@ class BehaviouralCloning:
         obs_tensor = torch.FloatTensor(self._obs)
         action_tensor = torch.LongTensor(self._actions)
 
+        # Sanitize observations — replace NaN/Inf with 0 to prevent gradient corruption
+        obs_tensor = torch.nan_to_num(obs_tensor, nan=0.0, posinf=1.0, neginf=-1.0)
+
         # Use the full policy for forward pass — we train the action_net
         optimizer = optim.Adam(policy.parameters(), lr=self._lr)
         criterion = nn.CrossEntropyLoss()
@@ -173,6 +178,8 @@ class BehaviouralCloning:
 
                 loss = criterion(logits, act_batch)
                 loss.backward()
+                # Clip gradients to prevent exploding gradients / NaN weights
+                torch.nn.utils.clip_grad_norm_(policy.parameters(), max_norm=1.0)
                 optimizer.step()
 
                 epoch_loss += loss.item()
@@ -186,7 +193,7 @@ class BehaviouralCloning:
             if (epoch + 1) % 10 == 0:
                 # Compute accuracy on training data
                 with torch.no_grad():
-                    latent_pi_full, _, _ = policy.mlp_extractor(
+                    latent_pi_full, _ = policy.mlp_extractor(
                         policy.extract_features(obs_tensor, policy.pi_features_extractor)
                     )
                     logits_full = policy.action_net(latent_pi_full)

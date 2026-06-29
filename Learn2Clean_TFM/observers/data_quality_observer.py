@@ -122,11 +122,13 @@ class DataQualityObserver(BaseObserver):
         # --- Distribution stats ---
         if self._include_skewness and len(numeric.columns) > 0:
             skew_vals = numeric.apply(lambda c: abs(c.dropna().skew()) if len(c.dropna()) > 2 else 0.0)
-            features.append(float(skew_vals.mean()))
+            skew_mean = float(skew_vals.mean())
+            features.append(0.0 if np.isnan(skew_mean) else skew_mean)
 
         if self._include_kurtosis and len(numeric.columns) > 0:
             kurt_vals = numeric.apply(lambda c: abs(c.dropna().kurtosis()) if len(c.dropna()) > 3 else 0.0)
-            features.append(float(kurt_vals.mean()))
+            kurt_mean = float(kurt_vals.mean())
+            features.append(0.0 if np.isnan(kurt_mean) else kurt_mean)
 
         # --- Wasserstein drift from reference ---
         if self._include_drift:
@@ -140,7 +142,9 @@ class DataQualityObserver(BaseObserver):
                 history_vec[idx] = 1.0
 
         obs = np.array(features, dtype=np.float32)
-        return np.concatenate([obs, history_vec])
+        obs_combined = np.concatenate([obs, history_vec])
+        # Sanitize NaN/Inf to prevent policy network corruption
+        return np.nan_to_num(obs_combined, nan=0.0, posinf=1.0, neginf=-1.0)
 
     def _wasserstein_drift(self, numeric: pd.DataFrame) -> float:
         if self._reference_X is None or len(numeric.columns) == 0:

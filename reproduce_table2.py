@@ -590,6 +590,7 @@ def run_experiment(
     dataset_ids: List[str],
     skip_rl: bool = False,
     skip_oracle: bool = False,
+    skip_il: bool = False,
     rl_timesteps: int = RL_TIMESTEPS,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -600,6 +601,8 @@ def run_experiment(
         baselines += ["B4 (oracle-RF)", "B5 (oracle-TFM)"]
     if not skip_rl:
         baselines += ["B-RL-RF", "B-RL-TFM"]
+    if not skip_il:
+        baselines += ["B-IL-TFM"]
 
     accuracy_results: Dict[str, Dict[str, float]] = {b: {} for b in baselines}
     ece_results: Dict[str, Dict[str, float]] = {b: {} for b in baselines}
@@ -684,6 +687,102 @@ def run_experiment(
                 accuracy_results[b_name][did] = acc
                 ece_results[b_name][did] = ece
 
+        # 6. IL baseline (B-IL-TFM)
+        if not skip_il:
+            log.info("  Running B-IL-TFM (BC + PPO fine-tune, %d timesteps) ...", rl_timesteps)
+            try:
+                from il.dataset_type_classifier import classify_and_explain
+                from il.behavioural_cloning import run_behavioural_cloning
+                from Learn2Clean_TFM.transfer.pretrained_policy_loader import PretrainedPolicyLoader
+                from stable_baselines3 import PPO
+                from stable_baselines3.common.monitor import Monitor
+                from stable_baselines3.common.vec_env import DummyVecEnv
+                from Learn2Clean_TFM.envs.sequential_cleaning_env_v3 import SequentialCleaningEnvV3
+                from Learn2Clean_TFM.observers.data_quality_observer import DataQualityObserver
+                from Learn2Clean_TFM.rewards.multi_objective_reward import TFMAwareReward
+                from Learn2Clean_TFM.rewards.completeness_retention_reward import CompletenessRetentionReward
+                from Learn2Clean_TFM.actions.parameterized_action import (
+                    ParameterizedImputer, ParameterizedOutlierCleaner,
+                    ParameterizedScaler, ParameterizedDeduplicator,
+                )
+
+                # Classify dataset type for expert selection
+                classification = classify_and_explain(X_clean)
+                dataset_type = classification["dataset_type"]
+                log.info("    Dataset type for IL: %s", dataset_type)
+
+                # Step 1 — Behavioural Cloning on clean data
+                checkpoint_path = run_behavioural_cloning(
+                    X=X_clean, y=y,
+                    dataset_type=dataset_type,
+                    save_dir="il/checkpoints",
+                    n_epochs=50,
+                    n_seeds=3,
+                )
+                log.info("    BC checkpoint: %s", checkpoint_path)
+
+                # Step 2 — PPO fine-tuning from BC warm start
+                il_actions = [
+                    ParameterizedImputer(strategy="mean"),
+                    ParameterizedImputer(strategy="median"),
+                    ParameterizedImputer(strategy="knn"),
+                    ParameterizedOutlierCleaner(method="iqr"),
+                    ParameterizedOutlierCleaner(method="zscore"),
+                    ParameterizedDeduplicator(),
+                    ParameterizedScaler(method="minmax"),
+                    ParameterizedScaler(method="zscore"),
+                ]
+
+                def make_il_env():
+                    env = SequentialCleaningEnvV3(
+                        X=X_dirty, y=y,
+                        actions=il_actions,
+                        reward_fn=TFMAwareReward(eval_model="tabpfn", tabpfn_max_rows=256),
+                        observer=DataQualityObserver(),
+                        max_steps=len(il_actions),
+                    )
+                    return Monitor(env)
+
+                vec_env = DummyVecEnv([make_il_env])
+                loader = PretrainedPolicyLoader(checkpoint_path=checkpoint_path)
+                il_model = loader.load_into(
+                    target_env=vec_env,
+                    algorithm_class=PPO,
+                    verbose=0,
+                    seed=SEED,
+                    learning_rate=1e-4,
+                )
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    il_model.learn(total_timesteps=rl_timesteps)
+                vec_env.close()
+
+                # Step 3 — Apply IL policy and evaluate
+                eval_env = SequentialCleaningEnvV3(
+                    X=X_dirty, y=y,
+                    actions=il_actions,
+                    reward_fn=CompletenessRetentionReward(),
+                    observer=DataQualityObserver(),
+                    max_steps=len(il_actions),
+                )
+                obs, _ = eval_env.reset()
+                done = False
+                while not done:
+                    action, _ = il_model.predict(obs, deterministic=True)
+                    obs, _, terminated, truncated, _ = eval_env.step(int(action))
+                    done = terminated or truncated
+
+                X_il = eval_env.current_X
+                acc, ece = evaluate_with_tabpfn(X_il, y)
+                log.info("    B-IL-TFM → accuracy=%.4f  ECE=%.4f", acc, ece)
+
+            except Exception as exc:
+                log.warning("    B-IL-TFM failed: %s", exc)
+                acc, ece = float("nan"), float("nan")
+
+            accuracy_results["B-IL-TFM"][did] = acc
+            ece_results["B-IL-TFM"][did] = ece
+
     # Build DataFrames
     col_order = dataset_ids + ["Mean"]
     acc_df = pd.DataFrame(accuracy_results).T.reindex(columns=dataset_ids)
@@ -752,6 +851,11 @@ def parse_args() -> argparse.Namespace:
         help="Skip oracle baselines (B4, B5). Faster but incomplete.",
     )
     parser.add_argument(
+        "--skip-il",
+        action="store_true",
+        help="Skip IL baseline (B-IL-TFM). Faster but skips imitation learning.",
+    )
+    parser.add_argument(
         "--timesteps",
         type=int,
         default=RL_TIMESTEPS,
@@ -785,6 +889,7 @@ if __name__ == "__main__":
         dataset_ids=dataset_ids,
         skip_rl=args.skip_rl,
         skip_oracle=args.skip_oracle,
+        skip_il=args.skip_il,
         rl_timesteps=args.timesteps,
     )
 

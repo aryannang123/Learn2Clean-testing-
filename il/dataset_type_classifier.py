@@ -35,38 +35,20 @@ def classify_dataset_type(
     verbose: bool = False,
 ) -> str:
     """
-    Classify a dataset as "binary", "medical", or "continuous".
+    Classify a dataset as "binary", "medical", "continuous", or "high_dimensional".
 
     Decision logic
     --------------
     1. BINARY: If >90% of numeric column values are in {0, 1} AND
        the mean unique-value ratio per column is <5% of total rows.
-       Catches one-hot encoded or binary vote datasets.
 
     2. MEDICAL: If mean missing rate across columns is >10% AND
        the mean absolute pairwise correlation among numeric columns is >0.30.
-       High missingness + correlated features = clinical data pattern.
 
-    3. CONTINUOUS: Default fallback for numeric data with skewed distributions.
+    3. HIGH_DIMENSIONAL: If number of columns > 2x number of rows, or
+       more than 50 numeric columns. Needs feature selection first.
 
-    Parameters
-    ----------
-    X : pd.DataFrame
-        Feature matrix (target column already removed).
-    binary_unique_threshold : float
-        Max ratio of unique values per column to total rows for binary classification.
-    binary_value_threshold : float
-        Min fraction of values that must be in {0, 1} to call binary.
-    medical_missing_threshold : float
-        Min mean missing rate to consider dataset as medical-type.
-    medical_corr_threshold : float
-        Min mean absolute pairwise correlation to consider dataset as medical-type.
-    verbose : bool
-        If True, log the computed features used for classification.
-
-    Returns
-    -------
-    str : One of "binary", "medical", "continuous".
+    4. CONTINUOUS: Default fallback for numeric data with skewed distributions.
     """
     numeric = X.select_dtypes(include="number")
 
@@ -74,9 +56,7 @@ def classify_dataset_type(
         logger.warning("No numeric columns found — defaulting to 'continuous'.")
         return "continuous"
 
-    # ------------------------------------------------------------------
     # Feature 1: Binary value ratio
-    # ------------------------------------------------------------------
     total_values = numeric.size
     binary_values = ((numeric == 0) | (numeric == 1)).sum().sum()
     binary_ratio = float(binary_values / max(total_values, 1))
@@ -85,37 +65,33 @@ def classify_dataset_type(
     unique_ratios = numeric.nunique() / max(len(numeric), 1)
     mean_unique_ratio = float(unique_ratios.mean())
 
-    # ------------------------------------------------------------------
     # Feature 3: Missing rate
-    # ------------------------------------------------------------------
     mean_missing = float(numeric.isna().mean().mean())
 
-    # ------------------------------------------------------------------
     # Feature 4: Mean absolute pairwise correlation
-    # ------------------------------------------------------------------
     mean_corr = 0.0
     if numeric.shape[1] >= 2:
         try:
             filled = numeric.fillna(numeric.median())
             corr_matrix = filled.corr().abs()
-            # Exclude diagonal
             mask = np.ones(corr_matrix.shape, dtype=bool)
             np.fill_diagonal(mask, False)
             mean_corr = float(corr_matrix.values[mask].mean())
         except Exception:
             mean_corr = 0.0
 
+    # Feature 5: Dimensionality ratio
+    n_cols = numeric.shape[1]
+    n_rows = max(len(numeric), 1)
+    dim_ratio = n_cols / n_rows
+
     if verbose:
         logger.info(
             "Dataset classifier features: "
             "binary_ratio=%.3f mean_unique_ratio=%.4f "
-            "mean_missing=%.3f mean_corr=%.3f",
-            binary_ratio, mean_unique_ratio, mean_missing, mean_corr,
+            "mean_missing=%.3f mean_corr=%.3f n_cols=%d dim_ratio=%.4f",
+            binary_ratio, mean_unique_ratio, mean_missing, mean_corr, n_cols, dim_ratio,
         )
-
-    # ------------------------------------------------------------------
-    # Decision
-    # ------------------------------------------------------------------
 
     # Rule 1: Binary
     if (
@@ -128,7 +104,15 @@ def classify_dataset_type(
         )
         return "binary"
 
-    # Rule 2: Medical
+    # Rule 2: High dimensional — feature selection needed before cleaning
+    if n_cols > 50 or dim_ratio > 2.0:
+        logger.info(
+            "Classified as HIGH_DIMENSIONAL (n_cols=%d, dim_ratio=%.4f)",
+            n_cols, dim_ratio,
+        )
+        return "high_dimensional"
+
+    # Rule 3: Medical
     if (
         mean_missing >= medical_missing_threshold
         and mean_corr >= medical_corr_threshold
@@ -139,7 +123,7 @@ def classify_dataset_type(
         )
         return "medical"
 
-    # Rule 3: Default — Continuous
+    # Rule 4: Default — Continuous
     logger.info(
         "Classified as CONTINUOUS (binary_ratio=%.2f, mean_missing=%.2f, mean_corr=%.2f)",
         binary_ratio, mean_missing, mean_corr,
@@ -193,4 +177,5 @@ def classify_and_explain(X: pd.DataFrame) -> dict:
         "n_rows": len(X),
         "n_cols": X.shape[1],
         "n_numeric_cols": numeric.shape[1],
+        "dim_ratio": round(numeric.shape[1] / max(len(X), 1), 4),
     }

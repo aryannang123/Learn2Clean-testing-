@@ -61,7 +61,7 @@ class ExpertProfile:
     description: str = ""
 
     def __post_init__(self) -> None:
-        valid_types = {"binary", "continuous", "medical"}
+        valid_types = {"binary", "continuous", "medical", "high_dimensional"}
         if self.dataset_type not in valid_types:
             raise ValueError(
                 f"dataset_type must be one of {valid_types}, got {self.dataset_type!r}"
@@ -78,12 +78,13 @@ BINARY_EXPERT = ExpertProfile(
     name="BinaryExpert",
     dataset_type="binary",
     action_sequence=[
-        MEAN_IMPUTER,   # Fill NaN with mean (0/1 binary → fills with modal-ish value)
-        EXACT_DEDUP,    # Remove duplicate rows (voting records have exact duplicates)
+        MEAN_IMPUTER,    # Fill NaN with mean
+        MEDIAN_IMPUTER,  # Also demonstrate median imputation
+        EXACT_DEDUP,     # Remove duplicate rows
     ],
     description=(
         "For binary/categorical datasets (y/n votes, one-hot encoded features). "
-        "Only impute and deduplicate — never scale or apply IQR since all values "
+        "Impute and deduplicate — never scale or apply IQR since all values "
         "are already in {0, 1} and outlier removal corrupts the binary encoding."
     ),
 )
@@ -92,15 +93,18 @@ CONTINUOUS_EXPERT = ExpertProfile(
     name="ContinuousExpert",
     dataset_type="continuous",
     action_sequence=[
-        MEAN_IMPUTER,   # Fill NaN with column mean
-        IQR_OUTLIER,    # Clip extreme values (adult: capital_gain, fnlwgt are skewed)
-        EXACT_DEDUP,    # Remove duplicate rows
-        MINMAX_SCALER,  # Scale to [0,1] for consistent feature magnitudes
+        MEAN_IMPUTER,    # Fill NaN with column mean
+        KNN_IMPUTER,     # Fill remaining NaN with KNN (catches correlated patterns)
+        IQR_OUTLIER,     # Clip extreme values
+        EXACT_DEDUP,     # Remove duplicate rows
+        ZSCORE_OUTLIER,  # Catch additional outliers missed by IQR
+        MINMAX_SCALER,   # Scale to [0,1]
+        ZSCORE_SCALER,   # Also demonstrate z-score scaling
     ],
     description=(
         "For continuous numerical datasets with skewed distributions (adult income, "
-        "house prices). Mean impute first, then clip outliers with IQR, deduplicate, "
-        "and scale. IQR uses factor 3.0 to avoid over-aggressive removal on skewed cols."
+        "house prices). Full pipeline: impute → outlier removal → dedup → scale. "
+        "Covers all 8 action indices so BC can learn the full action distribution."
     ),
 )
 
@@ -108,15 +112,33 @@ MEDICAL_EXPERT = ExpertProfile(
     name="MedicalExpert",
     dataset_type="medical",
     action_sequence=[
-        KNN_IMPUTER,    # KNN imputation — preserves feature correlations (medical data is correlated)
-        EXACT_DEDUP,    # Remove duplicate patient records
-        ZSCORE_SCALER,  # Z-score normalisation — medical features have very different scales
+        KNN_IMPUTER,     # KNN imputation — preserves feature correlations
+        MEDIAN_IMPUTER,  # Also demonstrate median (robust to outliers in medical data)
+        EXACT_DEDUP,     # Remove duplicate patient records
+        IQR_OUTLIER,     # Remove physiological outliers
+        ZSCORE_SCALER,   # Z-score normalisation for scale differences
     ],
     description=(
-        "For medical/clinical datasets with high missingness and correlated features "
-        "(cancer, diabetes, hepatitis). KNN imputation preserves inter-feature correlations "
-        "that are clinically meaningful. Z-score scaling handles the extreme scale differences "
-        "between features like blood pressure (60-200) and glucose (0.5-5.0)."
+        "For medical/clinical datasets with high missingness and correlated features. "
+        "KNN imputation preserves inter-feature correlations. Z-score scaling handles "
+        "extreme scale differences between features."
+    ),
+)
+
+
+HIGH_DIMENSIONAL_EXPERT = ExpertProfile(
+    name="HighDimensionalExpert",
+    dataset_type="high_dimensional",
+    action_sequence=[
+        MEAN_IMPUTER,    # Fill NaN first — feature selection needs complete data
+        EXACT_DEDUP,     # Remove duplicates before selecting features
+        IQR_OUTLIER,     # Remove outliers that distort feature importance
+        ZSCORE_SCALER,   # Scale before any distance-based operations
+    ],
+    description=(
+        "For high-dimensional datasets with many columns relative to rows. "
+        "Impute and deduplicate first, then remove outliers and scale. "
+        "Avoids aggressive feature selection that might remove useful columns."
     ),
 )
 
@@ -129,6 +151,7 @@ ALL_EXPERT_PROFILES: List[ExpertProfile] = [
     BINARY_EXPERT,
     CONTINUOUS_EXPERT,
     MEDICAL_EXPERT,
+    HIGH_DIMENSIONAL_EXPERT,
 ]
 
 EXPERT_PROFILES_BY_TYPE = {p.dataset_type: p for p in ALL_EXPERT_PROFILES}
@@ -137,25 +160,14 @@ EXPERT_PROFILES_BY_TYPE = {p.dataset_type: p for p in ALL_EXPERT_PROFILES}
 def get_expert_profile(dataset_type: str) -> ExpertProfile:
     """
     Return the expert profile for a given dataset type.
-
-    Parameters
-    ----------
-    dataset_type : str
-        One of "binary", "continuous", "medical".
-
-    Returns
-    -------
-    ExpertProfile
-
-    Raises
-    ------
-    KeyError if dataset_type is not registered.
+    Falls back to CONTINUOUS_EXPERT for unknown types.
     """
     if dataset_type not in EXPERT_PROFILES_BY_TYPE:
-        raise KeyError(
-            f"No expert profile for dataset_type={dataset_type!r}. "
-            f"Available: {list(EXPERT_PROFILES_BY_TYPE.keys())}"
+        logger.warning(
+            "No expert profile for dataset_type=%r — falling back to continuous.",
+            dataset_type,
         )
+        return EXPERT_PROFILES_BY_TYPE["continuous"]
     return EXPERT_PROFILES_BY_TYPE[dataset_type]
 
 
