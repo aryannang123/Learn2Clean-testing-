@@ -716,8 +716,8 @@ def run_experiment(
                     X=X_clean, y=y,
                     dataset_type=dataset_type,
                     save_dir="il/checkpoints",
-                    n_epochs=50,
-                    n_seeds=3,
+                    n_epochs=20,
+                    n_seeds=2,
                 )
                 log.info("    BC checkpoint: %s", checkpoint_path)
 
@@ -737,7 +737,7 @@ def run_experiment(
                     env = SequentialCleaningEnvV3(
                         X=X_dirty, y=y,
                         actions=il_actions,
-                        reward_fn=TFMAwareReward(eval_model="tabpfn", tabpfn_max_rows=256),
+                        reward_fn=TFMAwareReward(eval_model="tabpfn", tabpfn_max_rows=64),
                         observer=DataQualityObserver(),
                         max_steps=len(il_actions),
                     )

@@ -97,14 +97,14 @@ CONTINUOUS_EXPERT = ExpertProfile(
         KNN_IMPUTER,     # Fill remaining NaN with KNN (catches correlated patterns)
         IQR_OUTLIER,     # Clip extreme values
         EXACT_DEDUP,     # Remove duplicate rows
-        ZSCORE_OUTLIER,  # Catch additional outliers missed by IQR
-        MINMAX_SCALER,   # Scale to [0,1]
-        ZSCORE_SCALER,   # Also demonstrate z-score scaling
+        # NOTE: Scaling removed — TabPFN v2 applies its own internal z-normalisation
+        # and power scaling. Pre-scaling with MinMax/ZScore before TabPFN compounds
+        # the transforms, degrading calibration (higher ECE) without improving accuracy.
     ],
     description=(
         "For continuous numerical datasets with skewed distributions (adult income, "
-        "house prices). Full pipeline: impute → outlier removal → dedup → scale. "
-        "Covers all 8 action indices so BC can learn the full action distribution."
+        "house prices). Impute → outlier removal → dedup. "
+        "Scaling intentionally omitted — TabPFN handles normalisation internally."
     ),
 )
 
@@ -116,12 +116,13 @@ MEDICAL_EXPERT = ExpertProfile(
         MEDIAN_IMPUTER,  # Also demonstrate median (robust to outliers in medical data)
         EXACT_DEDUP,     # Remove duplicate patient records
         IQR_OUTLIER,     # Remove physiological outliers
-        ZSCORE_SCALER,   # Z-score normalisation for scale differences
+        # NOTE: ZScore scaling removed — same reason as ContinuousExpert.
+        # TabPFN v2 handles normalisation internally.
     ],
     description=(
         "For medical/clinical datasets with high missingness and correlated features. "
-        "KNN imputation preserves inter-feature correlations. Z-score scaling handles "
-        "extreme scale differences between features."
+        "KNN imputation preserves inter-feature correlations. No scaling — "
+        "TabPFN handles normalisation internally to preserve calibration."
     ),
 )
 

@@ -30,8 +30,8 @@ def classify_dataset_type(
     X: pd.DataFrame,
     binary_unique_threshold: float = 0.05,
     binary_value_threshold: float = 0.90,
-    medical_missing_threshold: float = 0.10,
-    medical_corr_threshold: float = 0.30,
+    medical_missing_threshold: float = 0.05,
+    medical_corr_threshold: float = 0.15,
     verbose: bool = False,
 ) -> str:
     """
