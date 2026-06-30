@@ -76,13 +76,21 @@ DATASETS = {
     "D1": "hepatitis", "D2": "heart_statlog", "D3": "ionosphere",
     "D4": "blood_transfusion", "D5": "diabetes", "D6": "credit_g",
     "D7": "kr_vs_kp", "D8": "phoneme", "D9": "adult", "D10": "bank_marketing",
-    "ADULT":  "adult_clean_csv",
-    "VOTING": "voting_records_csv",
+    "ADULT":   "adult_clean_csv",
+    "VOTING":  "voting_records_csv",
+    "TITANIC": "titanic_csv",
+    # Additional OpenML datasets
+    "D11": "breast_cancer",      # breast cancer (medical, binary)
+    "D12": "vehicle",            # vehicle silhouettes (continuous, multi-class)
+    "D13": "hypothyroid",        # thyroid (medical, missing values)
+    "D14": "wine",               # wine quality (continuous, multi-class)
+    "D15": "mushroom",           # mushroom (binary, categorical)
 }
 
 LOCAL_CSV_DATASETS = {
     "adult_clean_csv":    {"path": ROOT / "data" / "adult_clean.csv",          "target_col": "income"},
     "voting_records_csv": {"path": ROOT / "data" / "voting_records_dirty.csv", "target_col": "party", "na_values": ["?"]},
+    "titanic_csv": {"path": ROOT / "data" / "titanic.csv", "target_col": "Survived"},
 }
 
 SEED = 42
@@ -131,6 +139,7 @@ def run_il_pipeline(
     n_demo_seeds: int = 3,
     use_dagger: bool = False,
     dagger_iterations: int = 5,
+    use_smart: bool = False,
 ) -> dict:
     """Run the full IL pipeline for one dataset. Returns results dict."""
     from Learn2Clean_TFM.data.error_injection import inject_missing_mcar
@@ -166,6 +175,29 @@ def run_il_pipeline(
             n_bc_epochs=bc_epochs,
             n_demo_seeds=n_demo_seeds,
         )
+    elif use_smart:
+        log.info("  Running Smart BC (AdaptiveExpert + ActionMasking)...")
+        # Smart BC needs enough rows to make reliable adaptive decisions
+        # Fall back to vanilla BC for small datasets
+        if len(X_clean) < 300:
+            log.info("  Dataset too small (%d rows) for Smart BC — falling back to vanilla BC", len(X_clean))
+            from il.behavioural_cloning import run_behavioural_cloning
+            checkpoint_path = run_behavioural_cloning(
+                X=X_clean, y=y,
+                dataset_type=dataset_type,
+                save_dir="il/checkpoints",
+                n_epochs=bc_epochs,
+                n_seeds=n_demo_seeds,
+            )
+        else:
+            from il.behavioural_cloning import run_smart_behavioural_cloning
+            checkpoint_path = run_smart_behavioural_cloning(
+                X=X_clean, y=y,
+                dataset_type=dataset_type,
+                save_dir="il/checkpoints",
+                n_epochs=bc_epochs,
+                n_seeds=n_demo_seeds,
+            )
     else:
         log.info("  Running Behavioural Cloning...")
         from il.behavioural_cloning import run_behavioural_cloning
@@ -394,6 +426,8 @@ def parse_args():
                         help="Use DAgger instead of vanilla BC for policy training.")
     parser.add_argument("--dagger-iterations", type=int, default=5,
                         help="Number of DAgger iterations (default: 5).")
+    parser.add_argument("--smart", action="store_true",
+                        help="Use Smart BC (AdaptiveExpert + ActionMasking) instead of vanilla BC.")
     return parser.parse_args()
 
 
@@ -410,6 +444,7 @@ if __name__ == "__main__":
             n_demo_seeds=args.demo_seeds,
             use_dagger=args.dagger,
             dagger_iterations=args.dagger_iterations,
+            use_smart=args.smart,
         )
 
         # --compare: also run pure RL baseline and add to result

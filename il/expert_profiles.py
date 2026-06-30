@@ -61,7 +61,7 @@ class ExpertProfile:
     description: str = ""
 
     def __post_init__(self) -> None:
-        valid_types = {"binary", "continuous", "medical", "high_dimensional"}
+        valid_types = {"binary", "continuous", "medical", "high_dimensional", "dedup_heavy", "clean"}
         if self.dataset_type not in valid_types:
             raise ValueError(
                 f"dataset_type must be one of {valid_types}, got {self.dataset_type!r}"
@@ -127,19 +127,48 @@ MEDICAL_EXPERT = ExpertProfile(
 )
 
 
+CLEAN_EXPERT = ExpertProfile(
+    name="CleanExpert",
+    dataset_type="clean",
+    action_sequence=[
+        IQR_OUTLIER,     # Handle skewed features (even clean datasets can have outliers)
+        ZSCORE_SCALER,   # Z-score scaling for datasets with very different feature scales
+    ],
+    description=(
+        "For datasets with no missing values and no duplicates. "
+        "Focus only on outlier removal and scaling. "
+        "Used when the data is already structurally clean."
+    ),
+)
+
+DEDUP_HEAVY_EXPERT = ExpertProfile(
+    name="DedupHeavyExpert",
+    dataset_type="dedup_heavy",
+    action_sequence=[
+        EXACT_DEDUP,     # Fix duplicates first
+        IQR_OUTLIER,     # Remove outliers with conservative factor
+        MINMAX_SCALER,   # Scale — needed for skewed features like V2/V3 in blood_transfusion
+    ],
+    description=(
+        "For datasets with high duplicate rates (>10%) and no/few missing values. "
+        "Deduplication first, then conservative outlier removal, then scale. "
+        "MinMax preferred over ZScore to preserve class distribution shape."
+    ),
+)
+
 HIGH_DIMENSIONAL_EXPERT = ExpertProfile(
     name="HighDimensionalExpert",
     dataset_type="high_dimensional",
     action_sequence=[
-        MEAN_IMPUTER,    # Fill NaN first — feature selection needs complete data
-        EXACT_DEDUP,     # Remove duplicates before selecting features
-        IQR_OUTLIER,     # Remove outliers that distort feature importance
-        ZSCORE_SCALER,   # Scale before any distance-based operations
+        MEDIAN_IMPUTER,  # Median more robust than mean for high-dim sparse data
+        EXACT_DEDUP,     # Remove duplicates
+        IQR_OUTLIER,     # Remove outliers
+        MINMAX_SCALER,   # Scale to [0,1] — needed for distance-based methods on wide data
     ],
     description=(
         "For high-dimensional datasets with many columns relative to rows. "
-        "Impute and deduplicate first, then remove outliers and scale. "
-        "Avoids aggressive feature selection that might remove useful columns."
+        "Median imputation (robust to outliers), dedup, outlier removal, then scale. "
+        "MinMax scaling important for high-dim data where features have very different ranges."
     ),
 )
 
@@ -153,6 +182,8 @@ ALL_EXPERT_PROFILES: List[ExpertProfile] = [
     CONTINUOUS_EXPERT,
     MEDICAL_EXPERT,
     HIGH_DIMENSIONAL_EXPERT,
+    DEDUP_HEAVY_EXPERT,
+    CLEAN_EXPERT,
 ]
 
 EXPERT_PROFILES_BY_TYPE = {p.dataset_type: p for p in ALL_EXPERT_PROFILES}

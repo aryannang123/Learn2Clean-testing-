@@ -125,6 +125,38 @@ BENCHMARK_DATASETS: Dict[str, DatasetSpec] = {
         eval_metric="f1",
         max_rows=10_000,
     ),
+    # --- Additional datasets for IL experiments ---
+    "breast_cancer": DatasetSpec(
+        name="breast_cancer",
+        openml_id=15,
+        eval_metric="f1",
+        max_rows=None,
+        zero_as_nan_cols=[],
+    ),
+    "vehicle": DatasetSpec(
+        name="vehicle",
+        openml_id=54,
+        eval_metric="accuracy",
+        max_rows=None,
+    ),
+    "hypothyroid": DatasetSpec(
+        name="hypothyroid",
+        openml_id=40,
+        eval_metric="f1",
+        max_rows=None,
+    ),
+    "wine": DatasetSpec(
+        name="wine",
+        openml_id=40691,
+        eval_metric="accuracy",
+        max_rows=None,
+    ),
+    "mushroom": DatasetSpec(
+        name="mushroom",
+        openml_id=24,
+        eval_metric="accuracy",
+        max_rows=5_000,
+    ),
 }
 
 

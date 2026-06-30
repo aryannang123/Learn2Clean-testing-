@@ -365,3 +365,99 @@ def run_behavioural_cloning(
 
     env.close()
     return checkpoint
+
+
+def run_smart_behavioural_cloning(
+    X: "pd.DataFrame",
+    y: "pd.Series",
+    dataset_type: str,
+    save_dir: str = "il/checkpoints",
+    n_epochs: int = 50,
+    mcar_rates=None,
+    n_seeds: int = 3,
+    seed: int = 42,
+) -> str:
+    """
+    Smart BC pipeline using AdaptiveExpert + ActionMasking.
+
+    Improvements over run_behavioural_cloning:
+    1. AdaptiveExpert picks actions based on current data state
+       instead of a fixed sequence — avoids wasted actions
+    2. ActionMasking filters out actions that can't help
+       (e.g. imputers when no missing values remain)
+    3. Higher quality training data → better BC accuracy
+
+    Returns
+    -------
+    str : Path to saved BC checkpoint.
+    """
+    import sys
+    from pathlib import Path as _Path
+    sys.path.insert(0, str(_Path(__file__).parents[1] / "src"))
+    sys.path.insert(0, str(_Path(__file__).parents[1]))
+
+    import Learn2Clean_TFM as _tfm
+    sys.modules.setdefault("learn2clean_v3", _tfm)
+
+    import pandas as pd
+    from stable_baselines3.common.vec_env import DummyVecEnv
+    from stable_baselines3.common.monitor import Monitor
+    from Learn2Clean_TFM.envs.sequential_cleaning_env_v3 import SequentialCleaningEnvV3
+    from Learn2Clean_TFM.observers.data_quality_observer import DataQualityObserver
+    from Learn2Clean_TFM.rewards.completeness_retention_reward import CompletenessRetentionReward
+    from Learn2Clean_TFM.data.error_injection import inject_missing_mcar
+    from Learn2Clean_TFM.actions.parameterized_action import (
+        ParameterizedImputer, ParameterizedOutlierCleaner,
+        ParameterizedScaler, ParameterizedDeduplicator,
+    )
+    from il.action_masking import MaskedTrajectoryCollector
+
+    logger.info("Running Smart BC (AdaptiveExpert + ActionMasking) for type: %s", dataset_type)
+
+    # Collect masked expert demonstrations
+    collector = MaskedTrajectoryCollector(
+        X=X, y=y,
+        dataset_type=dataset_type,
+        use_adaptive=True,
+        mcar_rates=mcar_rates,
+        n_seeds=n_seeds,
+    )
+    obs_array, action_array = collector.collect()
+
+    logger.info(
+        "Smart BC: collected %d transitions covering %d unique actions",
+        len(obs_array), len(np.unique(action_array)),
+    )
+
+    # Build env for PPO model construction
+    actions = [
+        ParameterizedImputer(strategy="mean"),
+        ParameterizedImputer(strategy="median"),
+        ParameterizedImputer(strategy="knn"),
+        ParameterizedOutlierCleaner(method="iqr"),
+        ParameterizedOutlierCleaner(method="zscore"),
+        ParameterizedDeduplicator(),
+        ParameterizedScaler(method="minmax"),
+        ParameterizedScaler(method="zscore"),
+    ]
+    X_for_env = inject_missing_mcar(X, rate=0.15, seed=seed)
+    raw_env = SequentialCleaningEnvV3(
+        X=X_for_env, y=y,
+        actions=actions,
+        reward_fn=CompletenessRetentionReward(),
+        observer=DataQualityObserver(),
+        max_steps=len(actions),
+    )
+    env = DummyVecEnv([lambda: Monitor(raw_env)])
+
+    bc = BehaviouralCloning(
+        obs_array=obs_array,
+        action_array=action_array,
+        n_actions=len(actions),
+        n_epochs=n_epochs,
+        seed=seed,
+    )
+    save_path = str(_Path(save_dir) / f"bc_smart_{dataset_type}.zip")
+    checkpoint = bc.train_and_save(env=env, save_path=save_path)
+    env.close()
+    return checkpoint

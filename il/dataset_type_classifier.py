@@ -104,7 +104,28 @@ def classify_dataset_type(
         )
         return "binary"
 
-    # Rule 2: High dimensional — feature selection needed before cleaning
+    # Rule 2: Dedup-heavy — high duplicate rate with low/no missing values
+    dup_ratio = float(X.duplicated().sum() / max(len(X), 1))
+    if dup_ratio > 0.10 and mean_missing < 0.02:
+        logger.info(
+            "Classified as DEDUP_HEAVY (dup_ratio=%.2f, mean_missing=%.4f)",
+            dup_ratio, mean_missing,
+        )
+        return "dedup_heavy"
+
+    # Rule 2b: Clean — no missing, no duplicates, focus on outliers + scaling
+    # Only classify as clean if ALSO low correlation and low skewness
+    # (avoids misclassifying datasets that look clean before MCAR injection)
+    filled = numeric.fillna(numeric.median())
+    mean_skew = float(filled.apply(lambda c: abs(c.skew()) if len(c.dropna()) > 2 else 0.0).mean())
+    if mean_missing < 0.001 and dup_ratio < 0.001 and mean_corr < 0.08 and mean_skew < 0.75:
+        logger.info(
+            "Classified as CLEAN (mean_missing=%.4f, dup_ratio=%.4f, corr=%.2f, skew=%.2f)",
+            mean_missing, dup_ratio, mean_corr, mean_skew,
+        )
+        return "clean"
+
+    # Rule 3: High dimensional
     if n_cols > 50 or dim_ratio > 2.0:
         logger.info(
             "Classified as HIGH_DIMENSIONAL (n_cols=%d, dim_ratio=%.4f)",
@@ -174,6 +195,7 @@ def classify_and_explain(X: pd.DataFrame) -> dict:
         "mean_unique_ratio": round(mean_unique_ratio, 4),
         "mean_missing": round(mean_missing, 4),
         "mean_corr": round(mean_corr, 4),
+        "dup_ratio": round(float(X.duplicated().sum() / max(len(X), 1)), 4),
         "n_rows": len(X),
         "n_cols": X.shape[1],
         "n_numeric_cols": numeric.shape[1],
