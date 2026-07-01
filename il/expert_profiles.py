@@ -112,17 +112,20 @@ MEDICAL_EXPERT = ExpertProfile(
     name="MedicalExpert",
     dataset_type="medical",
     action_sequence=[
-        KNN_IMPUTER,     # KNN imputation — preserves feature correlations
-        MEDIAN_IMPUTER,  # Also demonstrate median (robust to outliers in medical data)
+        KNN_IMPUTER,     # KNN imputation — critical for columns with >30% missing
+                         # (e.g. PROTIME in hepatitis: 54% missing needs correlation-aware fill)
+        MEDIAN_IMPUTER,  # Second pass median for any residual NaN
         EXACT_DEDUP,     # Remove duplicate patient records
-        IQR_OUTLIER,     # Remove physiological outliers
-        # NOTE: ZScore scaling removed — same reason as ContinuousExpert.
-        # TabPFN v2 handles normalisation internally.
+        # IQR outlier removal intentionally removed for medical datasets:
+        # - Small datasets (hepatitis: 155 rows) risk losing minority class samples
+        # - Medical outliers are often clinically meaningful (not errors)
+        # - Class imbalance (4:1 in hepatitis) makes row removal dangerous
     ],
     description=(
-        "For medical/clinical datasets with high missingness and correlated features. "
-        "KNN imputation preserves inter-feature correlations. No scaling — "
-        "TabPFN handles normalisation internally to preserve calibration."
+        "For medical/clinical datasets with high missingness, correlated features, "
+        "and class imbalance. KNN imputation first (handles columns with >30% missing "
+        "by using feature correlations), then median for residual NaN. "
+        "No outlier removal — small imbalanced datasets cannot afford row loss."
     ),
 )
 

@@ -591,6 +591,7 @@ def run_experiment(
     skip_rl: bool = False,
     skip_oracle: bool = False,
     skip_il: bool = False,
+    skip_cirl: bool = False,
     rl_timesteps: int = RL_TIMESTEPS,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -603,6 +604,8 @@ def run_experiment(
         baselines += ["B-RL-RF", "B-RL-TFM"]
     if not skip_il:
         baselines += ["B-IL-TFM"]
+    if not skip_cirl:
+        baselines += ["B-CIRL-TFM"]
 
     accuracy_results: Dict[str, Dict[str, float]] = {b: {} for b in baselines}
     ece_results: Dict[str, Dict[str, float]] = {b: {} for b in baselines}
@@ -783,6 +786,36 @@ def run_experiment(
             accuracy_results["B-IL-TFM"][did] = acc
             ece_results["B-IL-TFM"][did] = ece
 
+        # 7. Concurrent IL+RL baseline (B-CIRL-TFM)
+        if not skip_cirl:
+            log.info("  Running B-CIRL-TFM (Concurrent IL+RL, %d timesteps) ...", rl_timesteps)
+            try:
+                from il.dataset_type_classifier import classify_and_explain
+                from il.concurrent_il_rl import run_concurrent_il_rl
+
+                classification = classify_and_explain(X_clean)
+                dataset_type = classification["dataset_type"]
+                log.info("    Dataset type for CIRL: %s", dataset_type)
+
+                acc, ece = run_concurrent_il_rl(
+                    X_clean=X_clean,
+                    y=y,
+                    dataset_type=dataset_type,
+                    dataset_label=did,
+                    total_timesteps=rl_timesteps,
+                    il_weight=0.7,
+                    ece_penalty_coeff=0.6,
+                    n_demo_seeds=3,
+                )
+                log.info("    B-CIRL-TFM → accuracy=%.4f  ECE=%.4f", acc, ece)
+
+            except Exception as exc:
+                log.warning("    B-CIRL-TFM failed: %s", exc)
+                acc, ece = float("nan"), float("nan")
+
+            accuracy_results["B-CIRL-TFM"][did] = acc
+            ece_results["B-CIRL-TFM"][did] = ece
+
     # Build DataFrames
     col_order = dataset_ids + ["Mean"]
     acc_df = pd.DataFrame(accuracy_results).T.reindex(columns=dataset_ids)
@@ -856,6 +889,11 @@ def parse_args() -> argparse.Namespace:
         help="Skip IL baseline (B-IL-TFM). Faster but skips imitation learning.",
     )
     parser.add_argument(
+        "--skip-cirl",
+        action="store_true",
+        help="Skip Concurrent IL+RL baseline (B-CIRL-TFM).",
+    )
+    parser.add_argument(
         "--timesteps",
         type=int,
         default=RL_TIMESTEPS,
@@ -890,6 +928,7 @@ if __name__ == "__main__":
         skip_rl=args.skip_rl,
         skip_oracle=args.skip_oracle,
         skip_il=args.skip_il,
+        skip_cirl=args.skip_cirl,
         rl_timesteps=args.timesteps,
     )
 

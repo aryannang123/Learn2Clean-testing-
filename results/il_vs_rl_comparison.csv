@@ -1,12 +1,3 @@
-Dataset,Type,IL_Acc,RL_Acc,Delta,Winner
-VOTING,binary,0.9618,0.9389,0.0229,IL
-D1,continuous,0.8936,0.8511,0.0425,IL
-D2,continuous,0.8642,0.8519,0.0123,IL
-D3,continuous,0.9245,0.9245,0.0,Tie
-D4,continuous,0.7792,0.7662,0.013,IL
-D5,continuous,0.7273,0.7208,0.0065,IL
-D6,continuous,0.7078,0.7013,0.0065,IL
-D7,binary,0.9351,0.8896,0.0455,IL
-D8,continuous,0.8442,0.8506,-0.0064,RL
-D9,continuous,0.8571,0.8571,0.0,Tie
-D10,continuous,0.8961,0.8961,0.0,Tie
+dataset,dataset_type,b0_accuracy,il_accuracy,rl_accuracy,il_ece,rl_ece,il_ep_len_mean,rl_ep_len_mean,il_convergence_ep,rl_convergence_ep,acc_delta,ece_delta
+VOTING,binary,0.9618,0.9618,0.9618,0.0417,0.0281,8.0,9.55,5,5,0.0,0.0136
+D5,medical,0.7338,0.7532,0.7078,0.1049,0.1059,8.01,8.25,5,5,0.0454,-0.001

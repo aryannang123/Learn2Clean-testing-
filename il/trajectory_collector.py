@@ -108,6 +108,9 @@ class TrajectoryCollector:
         self._y = y.copy()
         self._expert = expert_profile
         self._mcar_rates = mcar_rates or [0.05, 0.10, 0.15, 0.20]
+        # Use more seeds for small datasets to get enough trajectory variety for BC
+        if n_seeds == 3 and len(X) < 300:
+            n_seeds = 5
         self._n_seeds = n_seeds
         self._max_steps = max_steps
 
