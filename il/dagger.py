@@ -273,6 +273,7 @@ class DAgger:
             action_array=act_array,
             n_actions=len(actions),
             n_epochs=self._n_bc_epochs,
+            net_arch=[64, 64],
             seed=self._seed,
         )
 

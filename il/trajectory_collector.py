@@ -277,22 +277,30 @@ def collect_all_expert_trajectories(
 
 def trajectories_to_arrays(
     trajectories: List[Trajectory],
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Flatten a list of trajectories into (observations, actions) arrays
+    Flatten a list of trajectories into (observations, actions, rewards) arrays
     ready for Behavioural Cloning training.
 
     Returns
     -------
-    obs_array : np.ndarray of shape (N, obs_dim)
+    obs_array    : np.ndarray of shape (N, obs_dim)
     action_array : np.ndarray of shape (N,) dtype int64
+    reward_array : np.ndarray of shape (N,) dtype float32
     """
     all_obs = []
     all_actions = []
+    all_rewards = []
 
     for traj in trajectories:
         obs, actions = traj.as_obs_action_pairs()
+        rewards = np.array([t.reward for t in traj.transitions], dtype=np.float32)
         all_obs.append(obs)
         all_actions.append(actions)
+        all_rewards.append(rewards)
 
-    return np.concatenate(all_obs, axis=0), np.concatenate(all_actions, axis=0)
+    return (
+        np.concatenate(all_obs, axis=0),
+        np.concatenate(all_actions, axis=0),
+        np.concatenate(all_rewards, axis=0),
+    )
