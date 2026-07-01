@@ -41,10 +41,6 @@ class BehaviouralCloning:
         Observation vectors collected from expert trajectories.
     action_array : np.ndarray of shape (N,) dtype int64
         Corresponding expert actions (class labels).
-    reward_array : np.ndarray of shape (N,) dtype float32, optional
-        Per-transition rewards for weighted BC training.
-        Higher-reward transitions get proportionally larger loss weight.
-        If None, all transitions are weighted equally (standard BC).
     n_actions : int
         Number of discrete actions (size of action space).
     n_epochs : int
@@ -53,10 +49,6 @@ class BehaviouralCloning:
         Mini-batch size for gradient updates.
     learning_rate : float
         Learning rate for the Adam optimiser.
-    net_arch : list[int]
-        Hidden layer sizes for the policy MLP.
-        Default [256, 256, 128] — larger than SB3's default [64, 64]
-        for better expert mapping capacity.
     seed : int
         Random seed for reproducibility.
     """
@@ -65,12 +57,10 @@ class BehaviouralCloning:
         self,
         obs_array: np.ndarray,
         action_array: np.ndarray,
-        reward_array: Optional[np.ndarray] = None,
         n_actions: int = 8,
         n_epochs: int = 50,
         batch_size: int = 32,
         learning_rate: float = 1e-3,
-        net_arch: Optional[List[int]] = None,
         seed: int = 42,
     ) -> None:
         if len(obs_array) != len(action_array):
@@ -85,33 +75,16 @@ class BehaviouralCloning:
         # Replace NaN/Inf in observations — prevents gradient corruption during BC
         self._obs = np.nan_to_num(self._obs, nan=0.0, posinf=1.0, neginf=-1.0)
         self._actions = action_array.astype(np.int64)
-
-        # Weighted BC — normalize rewards to [0, 1] and use as loss weights
-        if reward_array is not None and len(reward_array) > 0:
-            r = np.array(reward_array, dtype=np.float32)
-            r_min, r_max = r.min(), r.max()
-            if r_max > r_min:
-                self._weights = (r - r_min) / (r_max - r_min) + 0.1  # floor at 0.1
-            else:
-                self._weights = np.ones(len(r), dtype=np.float32)
-            self._weights = self._weights / self._weights.sum() * len(self._weights)
-        else:
-            self._weights = np.ones(len(self._obs), dtype=np.float32)
-
         self._n_actions = n_actions
         self._n_epochs = n_epochs
         self._batch_size = batch_size
         self._lr = learning_rate
-        self._net_arch = net_arch or [256, 256, 128]
         self._seed = seed
 
         self._obs_dim = self._obs.shape[1]
         logger.info(
-            "BehaviouralCloning initialised: %d transitions, obs_dim=%d, "
-            "n_actions=%d, net_arch=%s, weighted=%s",
+            "BehaviouralCloning initialised: %d transitions, obs_dim=%d, n_actions=%d",
             len(self._obs), self._obs_dim, self._n_actions,
-            self._net_arch,
-            "yes" if reward_array is not None else "no",
         )
 
     def train_and_save(
@@ -149,11 +122,10 @@ class BehaviouralCloning:
         if not hasattr(env, "num_envs"):
             env = DummyVecEnv([lambda: Monitor(env)])
 
-        # Step 1 — Build a fresh PPO model with larger network
+        # Step 1 — Build a fresh PPO model
         model = PPO(
             "MlpPolicy",
             env,
-            policy_kwargs={"net_arch": self._net_arch},
             verbose=0,
             seed=self._seed,
             learning_rate=self._lr,
@@ -163,18 +135,16 @@ class BehaviouralCloning:
         # SB3 MlpPolicy has: features_extractor → mlp_extractor → action_net
         policy = model.policy
 
-        # Step 3 — BC training loop (supervised cross-entropy, optionally weighted)
+        # Step 3 — BC training loop (supervised cross-entropy)
         obs_tensor = torch.FloatTensor(self._obs)
         action_tensor = torch.LongTensor(self._actions)
-        weight_tensor = torch.FloatTensor(self._weights)
 
         # Sanitize observations — replace NaN/Inf with 0 to prevent gradient corruption
         obs_tensor = torch.nan_to_num(obs_tensor, nan=0.0, posinf=1.0, neginf=-1.0)
 
         # Use the full policy for forward pass — we train the action_net
         optimizer = optim.Adam(policy.parameters(), lr=self._lr)
-        # reduction='none' so we can apply per-sample weights
-        criterion = nn.CrossEntropyLoss(reduction='none')
+        criterion = nn.CrossEntropyLoss()
 
         policy.train()
         rng = np.random.default_rng(self._seed)
@@ -189,7 +159,6 @@ class BehaviouralCloning:
             idx = rng.permutation(n_samples)
             obs_shuffled = obs_tensor[idx]
             act_shuffled = action_tensor[idx]
-            wgt_shuffled = weight_tensor[idx]
 
             epoch_loss = 0.0
             n_batches = 0
@@ -198,7 +167,6 @@ class BehaviouralCloning:
                 end = start + self._batch_size
                 obs_batch = obs_shuffled[start:end]
                 act_batch = act_shuffled[start:end]
-                wgt_batch = wgt_shuffled[start:end]
 
                 optimizer.zero_grad()
 
@@ -208,9 +176,7 @@ class BehaviouralCloning:
                 latent_pi, _ = policy.mlp_extractor(features)
                 logits = policy.action_net(latent_pi)
 
-                # Weighted cross-entropy loss
-                per_sample_loss = criterion(logits, act_batch)  # shape (batch,)
-                loss = (per_sample_loss * wgt_batch).mean()
+                loss = criterion(logits, act_batch)
                 loss.backward()
                 # Clip gradients to prevent exploding gradients / NaN weights
                 torch.nn.utils.clip_grad_norm_(policy.parameters(), max_norm=1.0)
@@ -355,10 +321,10 @@ def run_behavioural_cloning(
         n_seeds=n_seeds,
     )
     trajectories = collector.collect()
-    obs_array, action_array, reward_array = trajectories_to_arrays(trajectories)
+    obs_array, action_array = trajectories_to_arrays(trajectories)
 
     logger.info(
-        "Collected %d transitions for BC training (weighted by reward).",
+        "Collected %d transitions for BC training.",
         len(obs_array),
     )
 
@@ -386,14 +352,12 @@ def run_behavioural_cloning(
     )
     env = DummyVecEnv([lambda: Monitor(raw_env)])
 
-    # Train BC with reward weighting and larger network
+    # Train BC
     bc = BehaviouralCloning(
         obs_array=obs_array,
         action_array=action_array,
-        reward_array=reward_array,
         n_actions=len(actions),
         n_epochs=n_epochs,
-        net_arch=[64, 64],
         seed=seed,
     )
     save_path = str(_Path(save_dir) / f"bc_{dataset_type}.zip")
@@ -464,6 +428,8 @@ def run_smart_behavioural_cloning(
         "Smart BC: collected %d transitions covering %d unique actions",
         len(obs_array), len(np.unique(action_array)),
     )
+
+    # Build env for PPO model construction
     actions = [
         ParameterizedImputer(strategy="mean"),
         ParameterizedImputer(strategy="median"),
@@ -489,7 +455,6 @@ def run_smart_behavioural_cloning(
         action_array=action_array,
         n_actions=len(actions),
         n_epochs=n_epochs,
-        net_arch=[64, 64],
         seed=seed,
     )
     save_path = str(_Path(save_dir) / f"bc_smart_{dataset_type}.zip")
