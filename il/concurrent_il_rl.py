@@ -295,7 +295,7 @@ class ConcurrentILRL:
             n_seeds=self._n_demo_seeds,
         )
         trajectories = collector.collect()
-        obs_array, action_array, _ = trajectories_to_arrays(trajectories)
+        obs_array, action_array = trajectories_to_arrays(trajectories)
         log.info("  Collected %d expert transitions.", len(obs_array))
 
         # 3. Build action set and environment
