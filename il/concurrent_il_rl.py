@@ -298,8 +298,8 @@ class ConcurrentILRL:
         obs_array, action_array = trajectories_to_arrays(trajectories)
         log.info("  Collected %d expert transitions.", len(obs_array))
 
-        # 3. Build action set and environment
-        actions = self._build_actions()
+        # 3. Build action set and environment — gate harmful actions for binary data
+        actions = self._build_actions(dataset_type=self._dataset_type)
 
         def make_env():
             env = SequentialCleaningEnvV3(
@@ -407,21 +407,46 @@ class ConcurrentILRL:
 
     # ------------------------------------------------------------------
 
-    def _build_actions(self) -> list:
+    def _build_actions(self, dataset_type: str = "continuous") -> list:
+        """
+        Build the action set, gating harmful actions for binary datasets.
+
+        For binary datasets (y/n votes, one-hot encoded):
+          - IQR outlier removal (idx 3) is DISABLED — corrupts 0/1 encoding
+          - ZScore outlier removal (idx 4) is DISABLED — same reason
+          - MinMax scaler (idx 6) is DISABLED — TabPFN handles this internally
+          - ZScore scaler (idx 7) is DISABLED — same reason
+          Only imputers + deduplicator are allowed.
+
+        For all other types: full 8-action set.
+        """
         from Learn2Clean_TFM.actions.parameterized_action import (
             ParameterizedImputer, ParameterizedOutlierCleaner,
             ParameterizedScaler, ParameterizedDeduplicator,
         )
-        return [
-            ParameterizedImputer(strategy="mean"),
-            ParameterizedImputer(strategy="median"),
-            ParameterizedImputer(strategy="knn"),
-            ParameterizedOutlierCleaner(method="iqr"),
-            ParameterizedOutlierCleaner(method="zscore"),
-            ParameterizedDeduplicator(),
-            ParameterizedScaler(method="minmax"),
-            ParameterizedScaler(method="zscore"),
+
+        all_actions = [
+            ParameterizedImputer(strategy="mean"),      # 0
+            ParameterizedImputer(strategy="median"),    # 1
+            ParameterizedImputer(strategy="knn"),       # 2
+            ParameterizedOutlierCleaner(method="iqr"),  # 3
+            ParameterizedOutlierCleaner(method="zscore"), # 4
+            ParameterizedDeduplicator(),                # 5
+            ParameterizedScaler(method="minmax"),       # 6
+            ParameterizedScaler(method="zscore"),       # 7
         ]
+
+        if dataset_type == "binary":
+            # Gate: only imputers (0,1,2) + deduplicator (5) allowed
+            # Outlier removers (3,4) and scalers (6,7) are harmful on binary data
+            gated = [all_actions[i] for i in [0, 1, 2, 5]]
+            log.info(
+                "  Binary action gating applied — restricted to: "
+                "MeanImputer, MedianImputer, KNNImputer, ExactDedup (4 actions)"
+            )
+            return gated
+
+        return all_actions
 
     def _apply_policy(self, model, X_dirty, actions) -> pd.DataFrame:
         from Learn2Clean_TFM.envs.sequential_cleaning_env_v3 import SequentialCleaningEnvV3
