@@ -1,0 +1,9 @@
+dataset,dataset_type,variant,il_weight,ece_penalty,timesteps,accuracy,ece
+ADULT,continuous,V1: BC only,0.7,0.6,0,0.7662,0.0273
+ADULT,continuous,V2: PPO only (no BC),0.0,0.0,2000,0.7987,0.0488
+ADULT,continuous,V3: BC+PPO no ECE penalty,0.7,0.0,2000,0.7987,0.0368
+ADULT,continuous,V4: B-CIRL-TFM (full),0.7,0.6,2000,0.7987,0.0488
+VOTING,binary,V1: BC only,0.7,0.6,0,0.9389,0.0455
+VOTING,binary,V2: PPO only (no BC),0.0,0.0,2000,0.9695,0.0277
+VOTING,binary,V3: BC+PPO no ECE penalty,0.7,0.0,2000,0.9389,0.0455
+VOTING,binary,V4: B-CIRL-TFM (full),0.7,0.6,2000,0.9389,0.0455
