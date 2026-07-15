@@ -1,7 +1,3 @@
-![Learn2Clean](./docs/images/learn2clean-text.png)
-
----
-
 # B-CIRL-TFM: Concurrent Imitation and Reinforcement Learning for Automated Data Cleaning
 
 **B-CIRL-TFM** (Behavioural Concurrent Imitation-Reinforcement Learning with TabPFN) is a novel framework built on top of Learn2Clean V2 that addresses two fundamental limitations of pure RL-based data cleaning: the cold-start problem and calibration neglect.
