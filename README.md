@@ -284,21 +284,6 @@ poetry run pytest --cov=learn2clean
 
 ---
 
-## Citation
-
-If you use this codebase or build on this work, please cite:
-
-```bibtex
-@article{nangarath2025bcirl,
-  title     = {B-CIRL-TFM: Concurrent Imitation and Reinforcement Learning
-               for Automated Data Cleaning with Calibrated Predictions},
-  author    = {Nangarath, Aryan and Shekhar, Dhanush and Aithal, Abhishek},
-  year      = {2025},
-  institution = {PES University}
-}
-```
-
----
 
 ## Acknowledgements
 
