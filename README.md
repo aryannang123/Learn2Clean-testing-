@@ -290,3 +290,55 @@ Built on top of [Learn2Clean V2](https://github.com/LaureBerti/Learn2Clean) by L
 ## License
 
 BSD 3-Clause License
+
+---
+
+## 🐳 Docker (Reproducible Results)
+
+Run the full experiment pipeline without installing anything locally — just Docker.
+
+### Prerequisites
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
+
+### Build the image (~10 min, one time only)
+
+```bash
+git clone https://github.com/aryannang123/Learn2Clean-testing-.git
+cd Learn2Clean-testing-
+docker build -t learn2clean .
+```
+
+> **First run note:** TabPFN model weights (~203MB) are not included in the repo. Docker will download them automatically on first run — a browser window will open for one-time license acceptance.
+
+### Run experiments
+
+```bash
+# Static baselines B0-B3 on all datasets (~30 min)
+docker run --rm -v $(pwd)/results:/app/results learn2clean \
+  python reproduce_table2.py \
+  --datasets D1 D2 D3 D4 D5 D6 D8 D9 D10 ADULT VOTING \
+  --skip-rl --skip-oracle --skip-il --skip-cirl
+
+# Full B-CIRL-TFM on all datasets (~2.5 hours)
+docker run --rm -v $(pwd)/results:/app/results learn2clean \
+  python reproduce_table2.py \
+  --datasets D1 D2 D3 D4 D5 D6 D8 D9 D10 ADULT VOTING \
+  --skip-rl --skip-oracle --skip-il \
+  --timesteps 2000
+
+# Ablation study (~1.5 hours)
+docker run --rm -v $(pwd)/results:/app/results learn2clean \
+  python il/ablation.py --datasets D1 D7 ADULT VOTING
+
+# Interactive shell
+docker run --rm -it -v $(pwd)/results:/app/results learn2clean bash
+```
+
+### Read results
+
+```bash
+cat results/table2_pretty.txt
+```
+
+> **Note on D7 (kr_vs_kp):** This dataset crashes in Docker on Apple Silicon due to an OpenBLAS LAPACK incompatibility with all-binary data. D7 results from the native macOS run are included in `results/table2_accuracy.csv`.
+
