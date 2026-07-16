@@ -1,0 +1,39 @@
+# Git
+.git/
+.gitignore
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+
+# Outputs and results (mounted as volumes) — keep dataset cache
+experiments/outputs/
+wandb/
+
+# Checkpoints (large, regenerated at runtime)
+il/checkpoints/
+
+# TabPFN weights — too large for GitHub (203MB), copy manually if needed
+tabpfn_cache/
+
+# Old V1 (not needed in Docker)
+Learn2Clean_V1/
+
+# IDE
+.idea/
+.vscode/
+
+# Secrets
+.env

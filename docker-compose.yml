@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+
+  # ── Quick setup test ─────────────────────────────────────────────────────────
+  test:
+    build: .
+    command: python quick_test.py
+    volumes:
+      - ./results:/app/results
+
+  # ── Run static baselines B0-B3 on all 12 datasets ───────────────────────────
+  baselines:
+    build: .
+    command: >
+      python reproduce_table2.py
+      --skip-rl --skip-oracle --skip-il --skip-cirl
+      --timesteps 2000
+    volumes:
+      - ./results:/app/results
+    environment:
+      - WANDB_MODE=offline
+
+  # ── Run B-CIRL-TFM on all 12 datasets ───────────────────────────────────────
+  cirl:
+    build: .
+    command: >
+      python reproduce_table2.py
+      --skip-rl --skip-oracle --skip-il
+      --timesteps 2000
+    volumes:
+      - ./results:/app/results
+    environment:
+      - WANDB_MODE=offline
+      - WANDB_API_KEY=${WANDB_API_KEY:-offline}
+
+  # ── Ablation study ───────────────────────────────────────────────────────────
+  ablation:
+    build: .
+    command: python il/ablation.py --datasets D1 D7 ADULT VOTING
+    volumes:
+      - ./results:/app/results
+    environment:
+      - WANDB_MODE=offline
+
+  # ── Interactive shell for exploration ────────────────────────────────────────
+  shell:
+    build: .
+    command: bash
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./results:/app/results
+      - ./data:/app/data

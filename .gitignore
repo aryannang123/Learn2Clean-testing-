@@ -122,3 +122,6 @@ wandb/
 # macOS system files
 .DS_Store
 **/.DS_Store
+
+# TabPFN model weights — 203MB, too large for GitHub
+tabpfn_cache/
